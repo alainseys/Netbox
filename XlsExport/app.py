@@ -1,9 +1,15 @@
+#!/usr/bin/env python3
 """
+netbox_export_to_xlsx.py
+
 Export:
- - IP Ranges
- - IP Addresses
- -> TO XLS => Email 
+  • IP Ranges
+  • IP Addresses
+→ Two Excel files → Email to alain@provider.com
+
+SMTP: mailserver-01.provider.com:25 (no auth)
 """
+
 import argparse
 import sys
 from pathlib import Path
@@ -16,8 +22,7 @@ import urllib3
 from openpyxl import Workbook
 from openpyxl.styles import Font
 from openpyxl.utils import get_column_letter
-import os
-from dotenv import load_dotevn
+
 # --------------------------------------------------------------------------- #
 # Suppress SSL warnings
 # --------------------------------------------------------------------------- #
@@ -26,19 +31,23 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # --------------------------------------------------------------------------- #
 # Hardcoded Settings
 # --------------------------------------------------------------------------- #
+EMAIL_TO = ""
+SMTP_SERVER = ""
+SMTP_PORT = 25
+FROM_EMAIL = ""
 
-email_to = os.getenv("EMAIL_TO")
-smtp_server = os.getenv("SMTP_SERVER")
-smtp_port = os.getenv("SMTP_PORT")
-from_email = os.getenv("FROM_EMAIL")
-url_ip_ranges = os.getenv("URL_IP_RANGES")
-url_ip_addresses = os.getenv("URL_IP_ADDRESSES")
+# NetBox API Endpoints
+BASE_URL = "https://localhost/"
+URL_IP_RANGES = f"{BASE_URL}/api/ipam/ip-ranges/"
+URL_IP_ADDRESSES = f"{BASE_URL}/api/ipam/ip-addresses/"
 
+# Output files
 OUTPUT_IP_RANGES = Path("ip_ranges.xlsx")
 OUTPUT_IP_ADDRESSES = Path("ip_addresses.xlsx")
 
+
 # --------------------------------------------------------------------------- #
-# Safe string conversions
+# Safe string conversion
 # --------------------------------------------------------------------------- #
 def safe_string(value: Any) -> str:
     if value is None:
@@ -62,6 +71,7 @@ def safe_string(value: Any) -> str:
         ]
         return ", ".join(filter(None, items))
     return str(value)
+
 
 # --------------------------------------------------------------------------- #
 # Flatten IP Range
@@ -88,6 +98,7 @@ def flatten_ip_range(obj: Dict[str, Any]) -> Dict[str, Any]:
     for cf_key, cf_val in obj.get("custom_fields", {}).items():
         flat[f"CF: {cf_key}"] = safe_string(cf_val)
     return flat
+
 
 # --------------------------------------------------------------------------- #
 # Flatten IP Address
@@ -116,6 +127,7 @@ def flatten_ip_address(obj: Dict[str, Any]) -> Dict[str, Any]:
         flat[f"CF: {cf_key}"] = safe_string(cf_val)
     return flat
 
+
 # --------------------------------------------------------------------------- #
 # Fetch all pages
 # --------------------------------------------------------------------------- #
@@ -129,6 +141,7 @@ def fetch_all_pages(session: requests.Session, url: str) -> List[Dict[str, Any]]
         results.extend(data["results"])
         next_url = data.get("next")
     return results
+
 
 # --------------------------------------------------------------------------- #
 # Write Excel
@@ -166,6 +179,7 @@ def write_to_excel(records: List[Dict[str, Any]], output_path: Path, sheet_name:
 
     wb.save(output_path)
     print(f"Saved: {output_path} ({len(records)} rows)")
+
 
 # --------------------------------------------------------------------------- #
 # Send Email with Multiple Attachments
