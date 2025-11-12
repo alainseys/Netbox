@@ -130,4 +130,40 @@ def fetch_all_pages(session: requests.Session, url: str) -> List[Dict[str, Any]]
         next_url = data.get("next")
     return results
 
+# --------------------------------------------------------------------------- #
+# Write Excel
+# --------------------------------------------------------------------------- #
+def write_to_excel(records: List[Dict[str, Any]], output_path: Path, sheet_name: str) -> None:
+    if not records:
+        print(f"No data for {sheet_name}, skipping.")
+        return
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = sheet_name
+    headers = list(records[0].keys())
+    ws.append(headers)
+
+    header_font = Font(bold=True)
+    for cell in ws[1]:
+        cell.font = header_font
+
+    for rec in records:
+        row = [rec.get(h, "") for h in headers]
+        ws.append(row)
+
+    for col in ws.columns:
+        max_length = 0
+        column = col[0].column_letter
+        for cell in col:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except Exception:
+                pass
+        adjusted_width = min(max_length + 2, 60)
+        ws.column_dimensions[column].width = adjusted_width
+
+    wb.save(output_path)
+    print(f"Saved: {output_path} ({len(records)} rows)")
 
