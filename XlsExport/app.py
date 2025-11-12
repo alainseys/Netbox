@@ -40,5 +40,27 @@ OUTPUT_IP_ADDRESSES = Path("ip_addresses.xlsx")
 # --------------------------------------------------------------------------- #
 # Safe string conversions
 # --------------------------------------------------------------------------- #
+def safe_string(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, (str, int, float)):
+        return str(value)
+    if isinstance(value, bool):
+        return "TRUE" if value else "FALSE"
+    if isinstance(value, dict):
+        return (
+            value.get("display")
+            or value.get("name")
+            or value.get("label")
+            or value.get("value")
+            or str(value)
+        )
+    if isinstance(value, list):
+        items = [
+            item.get("display") or item.get("name") or item.get("label") or str(item)
+            for item in value
+        ]
+        return ", ".join(filter(None, items))
+    return str(value)
 
 
