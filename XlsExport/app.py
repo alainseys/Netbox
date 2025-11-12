@@ -167,3 +167,98 @@ def write_to_excel(records: List[Dict[str, Any]], output_path: Path, sheet_name:
     wb.save(output_path)
     print(f"Saved: {output_path} ({len(records)} rows)")
 
+# --------------------------------------------------------------------------- #
+# Send Email with Multiple Attachments
+# --------------------------------------------------------------------------- #
+def send_email(attachments: List[Path]) -> None:
+    if not attachments:
+        print("No files to send.")
+        return
+
+    msg = EmailMessage()
+    msg["From"] = FROM_EMAIL
+    msg["To"] = EMAIL_TO
+    msg["Subject"] = f"NetBox Export: IP Ranges & Addresses ({len(attachments)} files)"
+
+    body = f"""
+Hello Alain,
+
+Attached are the latest NetBox exports:
+
+"""
+    for f in attachments:
+        body += f"- {f.name} ({f.stat().st_size // 1024} KB)\n"
+    body += f"\nGenerated on: {__import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M')}\n\nRegards,\nNetBox Export Bot"
+    msg.set_content(body)
+
+    for attachment_path in attachments:
+        with open(attachment_path, "rb") as f:
+            file_data = f.read()
+        msg.add_attachment(
+            file_data,
+            maintype="application",
+            subtype="vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            filename=attachment_path.name
+        )
+
+    print(f"Sending {len(attachments)} file(s) to {EMAIL_TO} via {SMTP_SERVER}:{SMTP_PORT}...")
+    try:
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=30) as server:
+            server.send_message(msg)
+        print("Email sent successfully!")
+    except Exception as e:
+        print(f"Failed to send email: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+# --------------------------------------------------------------------------- #
+# Main
+# --------------------------------------------------------------------------- #
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Export NetBox IP Ranges + IP Addresses → Excel → Email"
+    )
+    parser.add_argument("-t", "--token", required=True, help="NetBox API token")
+    args = parser.parse_args()
+
+    session = requests.Session()
+    session.headers.update({
+        "Authorization": f"Token {args.token}",
+        "Accept": "application/json"
+    })
+
+    # === Export IP Ranges ===
+    print("Fetching IP Ranges...")
+    try:
+        ip_ranges = fetch_all_pages(session, URL_IP_RANGES)
+        flat_ranges = [flatten_ip_range(r) for r in ip_ranges]
+        write_to_excel(flat_ranges, OUTPUT_IP_RANGES, "IP Ranges")
+    except Exception as e:
+        print(f"IP Ranges failed: {e}", file=sys.stderr)
+        ip_ranges_file = None
+    else:
+        ip_ranges_file = OUTPUT_IP_RANGES
+
+    # === Export IP Addresses ===
+    print("Fetching IP Addresses...")
+    try:
+        ip_addrs = fetch_all_pages(session, URL_IP_ADDRESSES)
+        flat_addrs = [flatten_ip_address(a) for a in ip_addrs]
+        write_to_excel(flat_addrs, OUTPUT_IP_ADDRESSES, "IP Addresses")
+    except Exception as e:
+        print(f"IP Addresses failed: {e}", file=sys.stderr)
+        ip_addrs_file = None
+    else:
+        ip_addrs_file = OUTPUT_IP_ADDRESSES
+
+    # === Send Email ===
+    attachments = [f for f in [ip_ranges_file, ip_addrs_file] if f and f.exists()]
+    if attachments:
+        send_email(attachments)
+    else:
+        print("No files generated. Email not sent.")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
