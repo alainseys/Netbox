@@ -195,7 +195,7 @@ def send_email(attachments: List[Path]) -> None:
     msg["Subject"] = f"NetBox Export: IP Ranges & Addresses ({len(attachments)} files)"
 
     body = f"""
-Hello Alain,
+Hello ,
 
 Attached are the latest NetBox exports:
 
@@ -220,6 +220,7 @@ Attached are the latest NetBox exports:
         with smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=30) as server:
             server.send_message(msg)
         print("Email sent successfully!")
+        
     except Exception as e:
         print(f"Failed to send email: {e}", file=sys.stderr)
         sys.exit(1)
